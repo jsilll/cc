@@ -11,6 +11,18 @@ void parse_result_free(ParseResult *result) {
   parse_error_stream_free(&result->errors);
 }
 
+static Type *type_init(Arena *arena, TypeKind kind) {
+  Type *type = arena_alloc(arena, sizeof(Type));
+  type->kind = kind;
+  return type;
+}
+
+static Type *type_init_ptr(Arena *arena, Type *base) {
+  Type *type = type_init(arena, TY_PTR);
+  type->base = base;
+  return type;
+}
+
 static ExprNode *expr_init(Arena *arena, StringView lex, ExprKind kind) {
   ExprNode *expr = arena_alloc(arena, sizeof(ExprNode));
   expr->type = NULL;
@@ -70,9 +82,10 @@ static StmtNode *stmt_init_expr(Arena *arena, StringView lex, ExprNode *expr) {
   return stmt;
 }
 
-static StmtNode *stmt_init_decl(Arena *arena, StringView lex, StringView name,
-                                ExprNode *expr) {
+static StmtNode *stmt_init_decl(Arena *arena, StringView lex, Type *type,
+                                StringView name, ExprNode *expr) {
   StmtNode *stmt = stmt_init(arena, lex, STMT_DECL);
+  stmt->u.decl.type = type;
   stmt->u.decl.name = name;
   stmt->u.decl.expr = expr;
   return stmt;
@@ -227,7 +240,7 @@ static ExprNode *parse_expr_primary(ParseCtx *ctx) {
   default:
     parse_error_stream_push(
         &ctx->result->errors,
-        (ParseError){PARSE_ERR_UNEXPECTED_TOKEN, NULL, TK_IDENT});
+        (ParseError){PARSE_ERR_UNEXPECTED_TOKEN, token, TK_IDENT});
     return NULL;
   }
 }
@@ -325,19 +338,25 @@ static StmtNode *parse_stmt(ParseCtx *ctx) {
     StmtNode *body = parse_stmt(ctx);
     return stmt_init_for(ctx->arena, token->lex, init, cond, step, body);
   }
-  case TK_KW_VOID: {
+  case TK_KW_INT: {
     ++ctx->idx;
-    Token *next = expect_token(ctx, TK_IDENT);
+    Type *type = TYPE_INT;
+    Token *next = peek_token(ctx);
+    if (next != NULL && next->kind == TK_STAR) {
+      type = type_init_ptr(ctx->arena, TYPE_INT);
+      ++ctx->idx;
+    }
+    next = expect_token(ctx, TK_IDENT);
     StringView name = next == NULL ? token->lex : next->lex;
     next = peek_token(ctx);
     if (next != NULL && next->kind != TK_SEMICOLON) {
       expect_token(ctx, TK_EQ);
       ExprNode *expr = parse_expr(ctx, 0);
       expect_token(ctx, TK_SEMICOLON);
-      return stmt_init_decl(ctx->arena, token->lex, name, expr);
+      return stmt_init_decl(ctx->arena, token->lex, type, name, expr);
     }
     expect_token(ctx, TK_SEMICOLON);
-    return stmt_init_decl(ctx->arena, token->lex, name, NULL);
+    return stmt_init_decl(ctx->arena, token->lex, type, name, NULL);
   }
   default: {
     ExprNode *expr = parse_expr(ctx, 0);

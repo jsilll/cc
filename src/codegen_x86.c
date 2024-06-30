@@ -25,6 +25,7 @@ static void codegen_ctx_init(CodegenCtx *ctx, FILE *out) {
 }
 
 static void codegen_ctx_free(CodegenCtx *ctx) {
+  DEBUGF("free offsets map of capacity: %zu", ctx->offset.capacity);
   hash_map_free(&ctx->offset);
   ctx->label = 0;
   ctx->out = NULL;
@@ -259,9 +260,7 @@ void codegen_x86(FILE *out, FuncNode *func) {
   fprintf(out, "  push %%rbp\n");
   fprintf(out, "  mov %%rsp, %%rbp\n");
   fprintf(out, "  sub $%ld, %%rsp\n", ctx.stack_size);
-  for (StmtNode *stmt = func->body; stmt != NULL; stmt = stmt->next) {
-    codegen_x86_stmt(&ctx, stmt);
-  }
+  codegen_x86_stmt(&ctx, func->body);
   ctx.stack_size = ALIGN_UP(ctx.stack_size, 16);
   codegen_ctx_free(&ctx);
   fprintf(out, ".L.return:\n");

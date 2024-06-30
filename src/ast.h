@@ -3,12 +3,22 @@
 
 #include "base.h"
 
-#define ENUMERATE_TYPES(M)                                                     \
-  M(TYPE_VOID)                                                                 \
-  M(TYPE_INT)                                                                  \
-  M(TYPE_PTR)
+typedef struct Type Type;
+typedef struct ExprNode ExprNode;
+typedef struct StmtNode StmtNode;
+typedef struct DeclNode DeclNode;
 
-DECLARE_ENUM_WITH_REPR(TypeKind, ENUMERATE_TYPES)
+#define GENERATE_TYPE_ENUM(Enum) TY_##Enum,
+
+#define GENERATE_TYPE_EXTERN(Enum) extern Type *TYPE_##Enum;
+
+#define ENUMERATE_TYPES(M)                                                     \
+  M(INT)                                                                       \
+  M(PTR)
+
+ENUMERATE_TYPES(GENERATE_TYPE_EXTERN)
+
+DECLARE_REPR_ENUM_MACRO(TypeKind, ENUMERATE_TYPES, GENERATE_TYPE_ENUM)
 
 #define ENUMERATE_UNOPS(M)                                                     \
   M(UNOP_ADD)                                                                  \
@@ -17,7 +27,7 @@ DECLARE_ENUM_WITH_REPR(TypeKind, ENUMERATE_TYPES)
   M(UNOP_ADDR)                                                                 \
   M(UNOP_DEREF)
 
-DECLARE_ENUM_WITH_REPR(UnOpKind, ENUMERATE_UNOPS)
+DECLARE_REPR_ENUM(UnOpKind, ENUMERATE_UNOPS)
 
 #define ENUMERATE_BINOPS(M)                                                    \
   M(BINOP_ADD)                                                                 \
@@ -32,7 +42,7 @@ DECLARE_ENUM_WITH_REPR(UnOpKind, ENUMERATE_UNOPS)
   M(BINOP_GE)                                                                  \
   M(BINOP_ASGN)
 
-DECLARE_ENUM_WITH_REPR(BinOpKind, ENUMERATE_BINOPS)
+DECLARE_REPR_ENUM(BinOpKind, ENUMERATE_BINOPS)
 
 #define ENUMERATE_EXPRS(M)                                                     \
   M(EXPR_NUM)                                                                  \
@@ -40,7 +50,7 @@ DECLARE_ENUM_WITH_REPR(BinOpKind, ENUMERATE_BINOPS)
   M(EXPR_UN)                                                                   \
   M(EXPR_BIN)
 
-DECLARE_ENUM_WITH_REPR(ExprKind, ENUMERATE_EXPRS)
+DECLARE_REPR_ENUM(ExprKind, ENUMERATE_EXPRS)
 
 #define ENUMERATE_STMTS(M)                                                     \
   M(STMT_EXPR)                                                                 \
@@ -51,26 +61,17 @@ DECLARE_ENUM_WITH_REPR(ExprKind, ENUMERATE_EXPRS)
   M(STMT_IF)                                                                   \
   M(STMT_FOR)
 
-DECLARE_ENUM_WITH_REPR(StmtKind, ENUMERATE_STMTS)
-
-typedef struct Type Type;
-typedef struct ExprNode ExprNode;
-typedef struct StmtNode StmtNode;
-typedef struct DeclNode DeclNode;
+DECLARE_REPR_ENUM(StmtKind, ENUMERATE_STMTS)
 
 struct Type {
   TypeKind kind;
-  union {
-    struct {
-      Type *base;
-    } ptr;
-  } u;
+  Type *base;
 };
 
 struct ExprNode {
-  Type *type;
   ExprKind kind;
   StringView lex;
+  Type *type;
   union {
     int32_t num;
     struct {
@@ -103,6 +104,7 @@ struct StmtNode {
       StmtNode *body;
     } block;
     struct {
+      Type *type;
       StringView name;
       ExprNode *expr;
     } decl;

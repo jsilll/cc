@@ -3,6 +3,7 @@
 #include "parse.h"
 #include "resolve.h"
 #include "scan.h"
+#include "sema.h"
 
 static void print_usage(const char *name) {
   fprintf(stderr, "usage: %s [ <stmt> | --file <file> ] [--emit-tokens]\n",
@@ -78,7 +79,7 @@ static void report_parse_errors(const SrcFile *file,
                "expected %s instead", token_kind_lex(errors->data[i].expected));
       break;
     case PARSE_ERR_UNEXPECTED_TOKEN:
-      error_at(file, (StringView){file->end, 1}, "unexpected token",
+      error_at(file, errors->data[i].token->lex, "unexpected token",
                "expected some other token instead");
       break;
     }
@@ -138,7 +139,7 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  ///// Scan /////
+  /// Scan ///
 
   ScanResult sr = scan(&file, true);
   if (emit_tokens) {
@@ -152,7 +153,7 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
-  ///// Parse /////
+  /// Parse ///
 
   Arena arena;
   arena_init(&arena, KB(64));
@@ -176,8 +177,9 @@ int main(int argc, char *argv[]) {
   DEBUGF("arena total blocks: %d", arena_total_blocks(&arena));
   DEBUGF("arena commited bytes: %zu", arena_commited_bytes(&arena));
 
-  ///// Resolve /////
+  /// Resolve ///
 
+  DEBUG("Resolve");
   ResolveResult rr = resolve(&pr.ast);
   if (emit_ast) {
     fprintf(stderr, "RESOLVED AST\n");
@@ -193,9 +195,16 @@ int main(int argc, char *argv[]) {
 
   resolve_result_free(&rr);
 
-  ///// Sema /////
+  /// Sema ///
 
-  ///// Codegen /////
+  DEBUG("Sema");
+  sema(&arena, &pr.ast);
+  if (emit_ast) {
+    fprintf(stderr, "SEMA AST\n");
+    ast_debug(stderr, &pr.ast);
+  }
+
+  /// Codegen ///
 
   codegen_x86(stdout, &pr.ast);
 

@@ -1,14 +1,19 @@
 #include "ast.h"
 
-DEFINE_ENUM_WITH_REPR(TypeKind, ENUMERATE_TYPES)
+#define GENERATE_TYPE_VARIABLE(Enum)                                           \
+  Type *TYPE_##Enum = &(Type){TY_##Enum, NULL};
 
-DEFINE_ENUM_WITH_REPR(UnopKind, ENUMERATE_UNOPS)
+ENUMERATE_TYPES(GENERATE_TYPE_VARIABLE)
 
-DEFINE_ENUM_WITH_REPR(BinopKind, ENUMERATE_BINOPS)
+DEFINE_REPR_ENUM(TypeKind, ENUMERATE_TYPES)
 
-DEFINE_ENUM_WITH_REPR(ExprKind, ENUMERATE_EXPRS)
+DEFINE_REPR_ENUM(UnopKind, ENUMERATE_UNOPS)
 
-DEFINE_ENUM_WITH_REPR(StmtKind, ENUMERATE_STMTS)
+DEFINE_REPR_ENUM(BinopKind, ENUMERATE_BINOPS)
+
+DEFINE_REPR_ENUM(ExprKind, ENUMERATE_EXPRS)
+
+DEFINE_REPR_ENUM(StmtKind, ENUMERATE_STMTS)
 
 static void ast_expr_debug(FILE *out, ExprNode *expr, uint8_t indent) {
   for (uint8_t i = 0; i < indent; ++i) {
@@ -71,8 +76,16 @@ static void ast_stmt_debug(FILE *out, StmtNode *stmt, uint8_t indent) {
     }
     break;
   case STMT_DECL:
-    fprintf(out, "%s: '%.*s' %p\n", StmtKind_Repr[stmt->kind],
-            (int)stmt->u.decl.name.size, stmt->u.decl.name.data, (void *)stmt);
+    if (stmt->u.decl.type != NULL) {
+      fprintf(out, "%s<%s>: '%.*s' %p\n", StmtKind_Repr[stmt->kind],
+              TypeKind_Repr[stmt->u.decl.type->kind],
+              (int)stmt->u.decl.name.size, stmt->u.decl.name.data,
+              (void *)stmt);
+    } else {
+      fprintf(out, "%s: '%.*s' %p\n", StmtKind_Repr[stmt->kind],
+              (int)stmt->u.decl.name.size, stmt->u.decl.name.data,
+              (void *)stmt);
+    }
     if (stmt->u.decl.expr != NULL) {
       ast_expr_debug(out, stmt->u.decl.expr, indent + 1);
     }
@@ -114,7 +127,5 @@ void ast_debug(FILE *out, FuncNode *func) {
   if (func == NULL) {
     return;
   }
-  for (StmtNode *stmt = func->body; stmt != NULL; stmt = stmt->next) {
-    ast_stmt_debug(out, stmt, 1);
-  }
+  ast_stmt_debug(out, func->body, 1);
 }
